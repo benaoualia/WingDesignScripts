@@ -1,0 +1,725 @@
+$# ---------------------------------------------------------------------------------------------------------- 
+$# ----------------------------------------- Input parameters ------------------------------------------- 
+INTEGER lenline,fid,i
+STRING line[100]
+string inputs[100](25)
+TEXT_OPEN( "D:\KADER\MDO\2.cst\input.txt", "or", 0, 0, fid)
+i=0
+WHILE(TEXT_READ_string ( fid, line, lenline) == 0 )
+ i=i+1
+ inputs(i)=line
+END WHILE
+$# ---------------------------------------------------------------------------------------------------------- 
+$# ----------------------------------------- Variable Declaration ------------------------------------------- 
+$# ---------- Alluminuim properties ------------
+REAL Ealum,rhoalum
+Ealum = 1e6*str_to_real(inputs(1))
+REAL nialum = 0.33 
+rhoalum = str_to_real(inputs(2))*1e-6
+$# ---------- Thickness ------------
+REAL LE_skinthick,TR_skinthick,ribsthick,WB_skinthick,sparsthick
+LE_skinthick = str_to_real(inputs(3))
+TR_skinthick = str_to_real(inputs(4))
+ribsthick = str_to_real(inputs(5))
+WB_skinthick = str_to_real(inputs(6))
+sparsthick = str_to_real(inputs(7))
+$# ---------- Materials ------------
+STRING LE_skin_prop[32](7)
+LE_skin_prop(1) = "m:LE_skin_material"
+LE_skin_prop(3) = "`LE_skinthick`"
+STRING TR_skin_prop[32](7)
+TR_skin_prop(1) = "m:TR_skin_material"
+TR_skin_prop(3) = "`TR_skinthick`"
+STRING WB_skin_prop[32](7)
+WB_skin_prop(1) = "m:Aluminium"
+WB_skin_prop(3) = "`WB_skinthick`"
+STRING spar_prop[32](7)
+spar_prop(1) = "m:Aluminium"
+spar_prop(3) = "`sparsthick`"
+STRING rib_prop[32](7)
+rib_prop(1) = "m:Aluminium"
+rib_prop(3) = "`ribsthick`"
+$# ---------- Mesh seed element number ------------
+INTEGER n_str
+n_str = str_to_integer(inputs(8))
+INTEGER n_elemts
+n_elemts = n_str+1
+INTEGER ns=2
+INTEGER num_srf
+$# ---------- Spar cap section ------------
+REAL H,W,t1,t2,HH,WW,W1,tt
+H = str_to_real(inputs(9))
+W = str_to_real(inputs(10))
+t1 = str_to_real(inputs(11))
+t2 = str_to_real(inputs(12))
+$# ---------- Stringer section ------------
+HH =str_to_real(inputs(13))
+WW = str_to_real(inputs(14))
+W1 = str_to_real(inputs(15))
+tt = str_to_real(inputs(16))
+$# ---------- Paths ------------
+STRING root_path[100],patran_path[100],nastran_version[100]
+root_path=inputs(23)
+patran_path=inputs(24)
+nastran_version=inputs(25)
+
+$# ---------------------------------------------------------------------------------------------------------
+$# -------------------------------------- Create New database ---------------------------------------------- 
+
+uil_file_new.go( patran_path//"/template.db", @
+root_path//"\1.db" )
+$? YES 36000037 
+$? YES 36000002 
+set_current_dir( root_path )
+
+p3_express_options_file( "express.opt", FALSE, 3, 1, 52054, TRUE, [39.370079, @
+0., 0., 0., 39.370079, 0., 0., 0., 39.370079, 0., 0., 0.], 0, ["0"], [[-1]], [ @
+[-1]], [[-1]], TRUE, [0], TRUE, [0], TRUE, [0], 3, 1, 3 )
+
+
+$# --------------------------------------------------------------------------------------------------------- 
+$# -------------------------------------- Import model from iges files -------------------------------------
+ 
+REAL uil_file_import_ige_scale_model
+INTEGER uil_file_import_iges_i_summary(50)
+INTEGER uil_file_import_iges_p_summary(9)
+INTEGER R,j,x,y,s
+INTEGER loop_ids(4), edge_orients(4),edge_ids(4)
+REAL k,length,d
+
+$# ---------- import skin surfaces ------------
+ 
+ugi_import_iges_v5( root_path//"\LE.igs", 0, "default_group", [TRUE, @
+TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @
+TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, @
+FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE], [TRUE, TRUE, @
+TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE], "all", "", TRUE, "", 0, [0], @
+ [[FALSE]], [[FALSE]], [0], [0], TRUE, "", uil_file_import_ige_scale_model, @
+uil_file_import_iges_i_summary, uil_file_import_iges_p_summary )
+R=uil_file_import_iges_p_summary(3)/2 
+ 
+ugi_import_iges_v5( root_path//"\WB.igs", 0, "default_group", [TRUE, @
+TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @
+TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, @
+FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE], [TRUE, TRUE, @
+TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE], "all", "", TRUE, "", 0, [0], @
+ [[FALSE]], [[FALSE]], [0], [0], TRUE, "", uil_file_import_ige_scale_model, @
+uil_file_import_iges_i_summary, uil_file_import_iges_p_summary )
+ 
+ugi_import_iges_v5( root_path//"\TR.igs", 0, "default_group", [TRUE, @
+TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @
+TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, @
+FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE], [TRUE, TRUE, @
+TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE], "all", "", TRUE, "", 0, [0], @
+ [[FALSE]], [[FALSE]], [0], [0], TRUE, "", uil_file_import_ige_scale_model, @
+uil_file_import_iges_i_summary, uil_file_import_iges_p_summary )
+
+$# ---------- Skin surface edge identification ------------
+!! input edges.pcl
+INTEGER WB_side_left(2,`R`)
+INTEGER WB_side_right(2,`R`)
+INTEGER LE_face(2,`R+1`)
+INTEGER WB_face(2,`R+1`)
+INTEGER TR_face(2,`R+1`)
+
+WB_side_left(1,1:R)=edges(R,2*R+1,0,0)
+WB_side_left(2,1:R)=edges(R,3*R+1,0,0)
+WB_side_right(1,1:R)=edges(R,2*R+1,0,1)
+WB_side_right(2,1:R)=edges(R,3*R+1,0,1)
+LE_face(1,1:R+1)=edges(R,1,1,0)
+LE_face(2,1:R+1)=edges(R,2,1,0)
+WB_face(1,1:R+1)=edges(R,2*R+1,1,0)
+WB_face(2,1:R+1)=edges(R,3*R+1,1,0)
+TR_face(1,1:R+1)=edges(R,4*R+1,1,0)
+TR_face(2,1:R+1)=edges(R,5*R+1,1,0)
+
+INTEGER LE_side_left_dw(VIRTUAL)
+INTEGER TR_side_right_dw(VIRTUAL)
+SYS_ALLOCATE_ARRAY(LE_side_left_dw,1,R)
+SYS_ALLOCATE_ARRAY(TR_side_right_dw,1,R)
+LE_side_left_dw=edges(R,1,0,0)
+TR_side_right_dw=edges(R,4*R+1,0,1)
+
+$# ---------- Create Spar surfaces ------------
+
+ga_group_create( "spars.igs_L1" ) 
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["spars.igs_L1"] ) 
+
+num_srf=6*R
+STRING sgm_surface_2curve_created_ids[VIRTUAL]
+
+FOR (i= 1 to R) 
+ sgm_const_surface_2curve( "`num_srf+1`", "surface `2*R+i`.`WB_side_left(1,i)`", "surface `3*R+i`.`WB_side_left(2,i)`", sgm_surface_2curve_created_ids )
+ num_srf=num_srf+1
+END FOR
+FOR (i= 1 to R) 
+ sgm_const_surface_2curve( "`num_srf+1`", "surface `2*R+i`.`WB_side_right(1,i)`", "surface `3*R+i`.`WB_side_right(2,i)`", sgm_surface_2curve_created_ids )
+ num_srf=num_srf+1
+END FOR
+$# ---------- Spar surface edge identification ------------
+
+INTEGER Vertical(2,`R+1`)
+Vertical(1,1:R+1)=edges(R,6*R+1,1,0)
+Vertical(2,1:R+1)=edges(R,7*R+1,1,0)
+
+$# ---------- Create Rib surfaces ------------
+ ga_group_create( "ribs.igs_L1" ) 
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["ribs.igs_L1"] ) 
+
+FOR (i= 1 to R+1)
+ IF (i==(R+1)) THEN
+ j=i-1
+ ELSE
+ j=i
+ END IF
+ 
+ sgm_const_surface_2curve( "`num_srf+1`", "surface `2*j-1`.`LE_face(1,i)`", "surface `2*j`.`LE_face(2,i)`", sgm_surface_2curve_created_ids )
+ num_srf=num_srf+1
+ sgm_const_surface_2curve( "`num_srf+1`", "surface `2*R+j`.`WB_face(1,i)`", "surface `3*R+j`.`WB_face(2,i)`", sgm_surface_2curve_created_ids )
+ num_srf=num_srf+1
+ sgm_const_surface_2curve( "`num_srf+1`", "surface `4*R+j`.`TR_face(1,i)`", "surface `5*R+j`.`TR_face(2,i)`", sgm_surface_2curve_created_ids )
+ num_srf=num_srf+1
+ 
+END FOR
+
+$# ----------------------------------------------------------------------------------------------------------- 
+$# --------------------------------------------Create Materials----------------------------------------------- 
+
+$# ------------------- ALUMINIUM----------------
+material.create( "Analysis code ID", 1, "Analysis type ID", 1, "Aluminium", 0, @ 
+"Date: 14-Apr-11 Time: 16:25:54", "Isotropic", 1, "Directionality", @ 
+1, "Linearity", 1, "Homogeneous", 0, "Linear Elastic", 1, @ 
+"Model Options & IDs", ["", "", "", "", ""], [0, 0,0, 0, 0], "Active Flag", @ 
+1, "Create", 10, "External Flag", FALSE, "Property IDs", ["Elastic Modulus", @ 
+"Poisson Ratio", "Density"], [2, 5, 16, 0], "Property Values", ["`Ealum`", "`nialum`", @ 
+"`rhoalum`", ""] ) 
+$# ------------------- LE_skin_material ----------------
+material.create( "Analysis code ID", 1, "Analysis type ID", 1, "LE_skin_material", 0, @ 
+"Date: 14-Apr-11 Time: 16:25:54", "Isotropic", 1, "Directionality", @ 
+1, "Linearity", 1, "Homogeneous", 0, "Linear Elastic", 1, @ 
+"Model Options & IDs", ["", "", "", "", ""], [0, 0,0, 0, 0], "Active Flag", @ 
+1, "Create", 10, "External Flag", FALSE, "Property IDs", ["Elastic Modulus", @ 
+"Poisson Ratio", "Density"], [2, 5, 16, 0], "Property Values", ["`Ealum`", "`nialum`", @ 
+"`rhoalum`", ""] ) 
+$# ------------------- TR_skin_material----------------
+material.create( "Analysis code ID", 1, "Analysis type ID", 1, "TR_skin_material", 0, @ 
+"Date: 14-Apr-11 Time: 16:25:54", "Isotropic", 1, "Directionality", @ 
+1, "Linearity", 1, "Homogeneous", 0, "Linear Elastic", 1, @ 
+"Model Options & IDs", ["", "", "", "", ""], [0, 0,0, 0, 0], "Active Flag", @ 
+1, "Create", 10, "External Flag", FALSE, "Property IDs", ["Elastic Modulus", @ 
+"Poisson Ratio", "Density"], [2, 5, 16, 0], "Property Values", ["`Ealum`", "`nialum`", @ 
+"`rhoalum`", ""] ) 
+
+$# ----------------------------------------------------------------------------------------------------------- 
+$# --------------------------------------------Create Properties--------------------------------------------- 
+
+$# ------------------- SHELL SKIN ----------------- 
+
+elementprops_create( "LE_ShellSkin", 51, 25, 35, 1, 1,20, [13, 20, 36, 4037, 4111, @ 
+4118, 4119], [5, 9, 1, 1, 1, 1, 1], LE_skin_prop, "Surface 1:`2*R`" )
+
+elementprops_create( "TR_ShellSkin", 51, 25, 35, 1, 1,20, [13, 20, 36, 4037, 4111, @ 
+4118, 4119], [5, 9, 1, 1, 1, 1, 1], TR_skin_prop, @
+"Surface `4*R+1`:`6*R`" ) 
+
+FOR (i= 1 to 2*R)
+elementprops_create( "WB_ShellSkin_"//str_from_integer(i), 51, 25, 35, 1, 1,20, [13, 20, 36, 4037, 4111, @ 
+4118, 4119], [5, 9, 1, 1, 1, 1, 1], WB_skin_prop, "Surface `2*R+i`" ) 
+END FOR
+$# ------------------- SHELL SPARS ----------------- 
+FOR (i= 1 to 2*R)
+elementprops_create( "ShellSpars_"//str_from_integer(i), 51, 25, 35, 1, 1, 20, [13, 20, 36, 4037, @ 
+4111, 4118, 4119], [5, 9, 1, 1, 1, 1, 1], spar_prop, "Surface `6*R+i`") 
+END FOR
+
+$# -------------------- SHELLRIBS ------------------
+FOR (i= 1 to 3*(R+1))
+elementprops_create( "ShellRibs_"//str_from_integer(i), 51, 25, 35, 1, 1, 20, [13, 20, 36, 4037, @ 
+4111, 4118, 4119], [5, 9, 1, 1, 1, 1, 1], rib_prop, "Surface `8*R+i`") 
+END FOR
+
+ga_group_create( "MSeed" ) 
+ga_group_entity_add( "MSeed", "" ) 
+ga_group_create( "MSpars" ) 
+ga_group_entity_add( "MSpars", "" ) 
+ga_group_create( "MRibs" ) 
+ga_group_entity_add( "MRibs", "" ) 
+ga_group_create( "MLE" ) 
+ga_group_entity_add( "MLE", "" ) 
+ga_group_create( "MWB" ) 
+ga_group_entity_add( "MWB", "" ) 
+ga_group_create( "MTR" ) 
+ga_group_entity_add( "MTR", "" ) 
+
+$# ------------------------------------------- Create Mesh Seed ----------------------------------- 
+
+
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MSeed"] ) 
+repaint_graphics( ) 
+
+ui_override_message(2001026 , "YES" )
+
+$#----------------------- ALL side ---------------------
+
+FOR (i= 1 to R)
+ FOR (j= 1 to 2)
+ mesh_seed_create( "Surface `2*R+(j-1)*R+i`.`WB_side_left(j,i)`", 1, ns, 0., 0., 0. )
+ mesh_seed_create( "Surface `2*R+(j-1)*R+i`.`WB_side_right(j,i)`", 1, ns, 0., 0., 0. )
+ END FOR
+ mesh_seed_create( "Surface `2*i-1`.`LE_side_left_dw(i)`", 1, ns, 0., 0., 0. )
+ mesh_seed_create( "Surface `4*R+i`.`TR_side_right_dw(i)`", 1, ns, 0., 0., 0. )
+END FOR
+$#----------------------- WB face ---------------------.
+
+FOR (i= 1 to R+1)
+ IF (i==(R+1)) THEN
+ x=i-1
+ ELSE
+ x=i
+ END IF
+ FOR (j= 1 to 2)
+ mesh_seed_create( "Surface `2*R+(j-1)*R+x`.`WB_face(j,i)`", 1, n_elemts, 0., 0., 0. )
+ END FOR
+END FOR
+
+$#----------------------- LE face ---------------------.
+
+FOR (j= 0 to 1)
+ FOR (i= 1 to R+1)
+ IF (i==(R+1)) THEN
+ x=i-1
+ ELSE
+ x=i
+ END IF
+ y=LE_face(2-j,i)
+ mesh_seed_create( "Surface `2*x-j`.`y`", 1, 5, 0., 0., 0. )
+ END FOR
+END FOR
+
+$#----------------------- TR face ---------------------.
+
+FOR (j= 0 to 1)
+ FOR (i= 1 to R+1)
+ IF (i==(R+1)) THEN
+ x=i-1
+ ELSE
+ x=i
+ END IF 
+ y=TR_face(j+1,i)
+ mesh_seed_create( "Surface `4*R+R*j+x`.`y`", 1, 7, 0., 0., 0. )
+ END FOR
+END FOR
+
+$#----------------------- Vetical ---------------------.
+FOR (j= 0 to 1)
+ FOR (i= 1 to R+1)
+ IF (i==R+1) THEN
+ x=i-1
+ ELSE
+ x=i
+ END IF
+ y=Vertical(j+1,i)
+ mesh_seed_create( "Surface `6*R+R*j+x`.`y`", 1, 6, 0., 0., 0. )
+ END FOR
+END FOR
+
+# ---------------------------------------------Mesh Creation---------------------------------------------
+$# ----------------------------------------------------------------------------------------------------
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MLE"] ) 
+repaint_graphics( ) 
+
+INTEGER num_elem,num_nodes
+INTEGER fem_create_mesh_surfa_num_nodes
+INTEGER fem_create_mesh_surfa_num_elems
+STRING fem_create_mesh_s_nodes_created[VIRTUAL]
+STRING fem_create_mesh_s_elems_created[VIRTUAL]
+
+fem_create_mesh_surf_4( "IsoMesh", 49152, "Surface 1:`2*R`", 1, ["3.09946"], @
+"Quad4", "#", "#", "Coord 0", "Coord 0", fem_create_mesh_surfa_num_nodes, @
+fem_create_mesh_surfa_num_elems, fem_create_mesh_s_nodes_created, @
+fem_create_mesh_s_elems_created )
+fem_associate_elems_to_ep( "LE_ShellSkin", fem_create_mesh_s_elems_created, @
+fem_create_mesh_surfa_num_elems )
+num_elem=num_elem+fem_create_mesh_surfa_num_elems
+num_nodes=num_nodes+fem_create_mesh_surfa_num_nodes
+
+$# ----------------------------------------------------------------------------------------------------
+
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MWB"] ) 
+
+FOR (i= 1 to 2*R)
+ fem_create_mesh_surf_4( "IsoMesh", 49152, "Surface `2*R+i`", 1, ["3.09946"], @
+ "Quad4", "#", "#", "Coord 0", "Coord 0", fem_create_mesh_surfa_num_nodes, @
+ fem_create_mesh_surfa_num_elems, fem_create_mesh_s_nodes_created, @
+ fem_create_mesh_s_elems_created )
+ fem_associate_elems_to_ep( "WB_ShellSkin_"//str_from_integer(i), fem_create_mesh_s_elems_created, @
+ fem_create_mesh_surfa_num_elems )
+ num_elem=num_elem+fem_create_mesh_surfa_num_elems
+ num_nodes=num_nodes+fem_create_mesh_surfa_num_nodes
+END FOR
+$# ----------------------------------------------------------------------------------------------------
+
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MTR"] ) 
+
+fem_create_mesh_surf_4( "IsoMesh", 49152, @
+ "Surface `4*R+1`:`6*R`", 1, ["3.09946"], @
+"Quad4", "#", "#", "Coord 0", "Coord 0", fem_create_mesh_surfa_num_nodes, @
+fem_create_mesh_surfa_num_elems, fem_create_mesh_s_nodes_created, @
+fem_create_mesh_s_elems_created )
+fem_associate_elems_to_ep( "TR_ShellSkin", fem_create_mesh_s_elems_created, @
+fem_create_mesh_surfa_num_elems )
+num_elem=num_elem+fem_create_mesh_surfa_num_elems
+num_nodes=num_nodes+fem_create_mesh_surfa_num_nodes
+
+
+$# ----------------------------------------------------------------------------------------------------
+
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MSpars"] ) 
+repaint_graphics( ) 
+
+FOR (i= 1 to 2*R)
+ fem_create_mesh_surf_4( "IsoMesh", 49152, "Surface `6*R+i`",@
+ 1, ["2.34849"], @
+ "Quad4", "#", "#", "Coord 0", "Coord 0", fem_create_mesh_surfa_num_nodes, @
+ fem_create_mesh_surfa_num_elems, fem_create_mesh_s_nodes_created, @
+ fem_create_mesh_s_elems_created )
+ fem_associate_elems_to_ep( "ShellSpars_"//str_from_integer(i), fem_create_mesh_s_elems_created, @
+ fem_create_mesh_surfa_num_elems )
+ num_elem=num_elem+fem_create_mesh_surfa_num_elems
+ num_nodes=num_nodes+fem_create_mesh_surfa_num_nodes
+END FOR
+
+$# ----------------------------------------------------------------------------------------------------
+
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MRibs"] ) 
+repaint_graphics( ) 
+
+FOR (i= 1 to 3*(R+1))
+ fem_create_mesh_surf_4( "IsoMesh", 49152, "Surface `8*R+i`",@
+ 1, ["2.34849"], "Quad4", "#", "#", "Coord 0", "Coord 0", @
+ fem_create_mesh_surfa_num_nodes, fem_create_mesh_surfa_num_elems, @
+ fem_create_mesh_s_nodes_created, fem_create_mesh_s_elems_created )
+ gu_fit_view( )
+ fem_associate_elems_to_ep( "ShellRibs_"//str_from_integer(i), fem_create_mesh_s_elems_created, @
+ fem_create_mesh_surfa_num_elems )
+ num_elem=num_elem+fem_create_mesh_surfa_num_elems
+ num_nodes=num_nodes+fem_create_mesh_surfa_num_nodes
+END FOR
+
+$#-----------------------------------------------------------------------------------------------------------
+$#---------------------------------------------- strip properties ------------------------------------
+ga_group_create( "Strips" ) 
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["Strips"] ) 
+REAL prop(30),centroid(2),xyz1(3),xyz2(3),xyz3(3),dist,ends(2,3),points(7,2) 
+INTEGER nprop,num_pnt,pointid,status
+INTEGER order(2),ia_vertexids(2)
+STRING asm_grid_extract_cu_created_ids[VIRTUAL]
+STRING sect_name1[1](2),sect_name2[1](2),sect_name3[2](2),data[256](27)
+
+db_count_point(num_pnt)
+
+sect_name1=["L","U"]
+sect_name2=["F","B"]
+sect_name3=["-N","-I"]
+
+ui_override_message(1000034, "YES" )
+
+FOR (i= 0 to 1 )
+ y=WB_face(i+1,1)
+ sgm_db_get_gen_face_edge_ids ( (2+i)*R+1, 1, 4, @
+ loop_ids, edge_ids, edge_orients )
+ sgm_get_curve_length (edge_ids(y), length)
+ sgm_db_get_edge_vertex_ids( edge_ids(y),ia_vertexids )
+ sgm_db_get_point (ia_vertexids(1), xyz1, status )
+ sgm_db_get_point (ia_vertexids(2), xyz2, status )
+ IF (xyz1(1)>xyz2(1)) THEN
+ order=[0,1]
+ ends(1,1:3)=xyz1
+ ends(2,1:3)=xyz2
+ ELSE
+ order=[1,0]
+ ends(1,1:3)=xyz2
+ ends(2,1:3)=xyz1
+ END IF
+ 
+ FOR (j= 0 to 1 )
+
+ asm_const_grid_extract_v1( "`num_pnt+1`", "Surface `(2+i)*R+1`.`y`", order(j+1)+(1-2*order(j+1))*W/length,@
+ 1, asm_grid_extract_cu_created_ids )
+ num_pnt=num_pnt+1
+ db_get_point_id ( num_pnt, pointid)
+ sgm_db_get_point ( pointid, xyz1, status )
+ 
+ xyz2=ends(j+1,1:3)
+ dist =mth_sqrt((xyz1(1)-xyz2(1))**2+(xyz1(2)-xyz2(2))**2+(xyz1(3)-xyz2(3))**2)
+ 
+ xyz3(1)=(xyz1(1)-xyz2(1))/dist
+ xyz3(3)=(xyz1(3)-xyz2(3))/dist
+
+ FOR (s= 0 to 1 )
+
+ points(2,1)=(1-2*s)*W*xyz3(1)
+ points(2,2)=(1-2*s)*W*xyz3(3)
+ points(3,1)=(1-2*s)*W*xyz3(1)
+ points(3,2)=(1-2*s)*W*xyz3(3)+(1-2*i)*t1
+ points(4,1)=(1-2*s)*(2*j-1)*t2
+ points(4,2)=xyz3(3)/xyz3(1)*t2+(1-2*i)*t1
+ points(5,1)=(1-2*s)*(2*j-1)*t2
+ points(5,2)=(1-2*i)*H
+ points(6,2)=(1-2*i)*H
+
+ arbitrary_section_create( "L_twisted_"//sect_name2(j+1)//sect_name1(i+1)//sect_name3(s+1), 7, 1,points, [7], [0, 0, 0, 0] )
+ blgetproparbyCheck ( 1,7, 1, points,[7], [0, 0, 0, 0] , prop,nprop, centroid ) 
+ 
+ data(1)="L_twisted_"//sect_name2(j+1)//sect_name1(i+1)//sect_name3(s+1)
+ data(2)="m:Aluminium"
+ data(3)="<0 0 1>"
+ data(4)="<`(1-2*s)*(2*j-1)*sparsthick/2+centroid(1)` 0 `centroid(2)+(1-2*i)*WB_skinthick/2`>"
+ data(5)="<`(1-2*s)*(2*j-1)*sparsthick/2+centroid(1)` 0 `centroid(2)+(1-2*i)*WB_skinthick/2`>"
+ data(6)="1"
+ data(7)="1"
+
+ elementprops_create( sect_name2(j+1)//sect_name1(i+1)//sect_name3(s+1)//"_Strip", 11, 2, 42, 1, 1, 20, [39, 13, 6, 4042, 4043, @ 
+ 2047, 2048, 1, 10, 11, 4026, 1026, 4044, 4045, 4037, 4047, 4048, 4050, 4051, @ 
+ 4053, 4054, 4056, 4057, 4061, 8200, 8201, 8202], [11, 5, 2, 2, 2, 4, 4, 1, 1,@ 
+ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6, 4, 4, 4],data, "" ) 
+
+ END FOR
+ END FOR
+END FOR
+
+$#-----------------------------------------------------------------------------------------------------------
+$#---------------------------------------------- strip mesh ------------------------------------
+ga_group_create( "MStrips" ) 
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MStrips"] ) 
+repaint_graphics( ) 
+INTEGER fem_create_mesh_curve_num_nodes
+INTEGER fem_create_mesh_curve_num_elems 
+STRING fem_create_mesh_c_nodes_created[VIRTUAL] 
+STRING fem_create_mesh_c_elems_created[VIRTUAL] 
+STRING sv_nodes_created[VIRTUAL]
+STRING sv_elements_created[VIRTUAL]
+STRING sv_nodes_deleted[VIRTUAL]
+STRING sv_elements_deleted[VIRTUAL]
+
+STRING Strip_data[100](4,2)=[["BL-N_Strip","BL-I_Strip"]@
+["BU-N_Strip","BU-I_Strip"]@
+["FL-N_Strip","FL-I_Strip"]@
+["FU-N_Strip","FU-I_Strip"]]
+string a[100]
+
+FOR (s= 1 to 2)
+ FOR (i= 1 to 2)
+ FOR (j= 1 to R)
+ IF (s==1) THEN
+ y=WB_side_left(i,j)
+ ELSE
+ y=WB_side_right(i,j)
+ END IF
+ a="Surface `(i+1)*R+j`.`y`"
+ fem_create_mesh_curv_1(a, 16384, 1., "Bar2", "#", "#", @
+ "Coord 0", "Coord 0", fem_create_mesh_curve_num_nodes, @ 
+ fem_create_mesh_curve_num_elems, fem_create_mesh_c_nodes_created, @ 
+ fem_create_mesh_c_elems_created ) 
+ num_elem=num_elem+fem_create_mesh_curve_num_elems
+ 
+ a=Strip_data((s-1)*2+i,1)
+ fem_associate_elems_to_ep(a, fem_create_mesh_c_elems_created, fem_create_mesh_curve_num_elems)
+ 
+ fem_translate_elems_1( "#", "<0 0 0>", "Coord 0", 1, FALSE, 2, @
+ "elm "//fem_create_mesh_c_elems_created,sv_nodes_created,sv_elements_created,sv_nodes_deleted, sv_elements_deleted)
+ num_elem=num_elem+fem_create_mesh_curve_num_elems
+ 
+ a=Strip_data((s-1)*2+i,2)
+ fem_associate_elems_to_ep(a, sv_elements_created, fem_create_mesh_curve_num_elems)
+ END FOR
+ END FOR
+END FOR
+
+
+$#-----------------------------------------------------------------------------------------------------------
+$#---------------------------------------------- Create stringer curves ------------------------------------
+ga_group_create( "Stringers" )
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["Stringers"] )
+
+STRING asm_line_2point_created_ids[VIRTUAL]
+
+INTEGER num_crv=4
+
+ui_override_message(38000217, "YES" )
+
+FOR (s= 0 to 1)
+
+ FOR (i= 1 to R+1)
+ y=WB_face(s+1,i)
+ IF (i==R+1) THEN
+ x=i-1
+ ELSE
+ x=i
+ END IF
+ 
+ sgm_db_get_gen_face_edge_ids ( (s+2)*R+x, 1, 4, @
+ loop_ids, edge_ids, edge_orients )
+ sgm_db_get_edge_vertex_ids( edge_ids(y),ia_vertexids )
+ sgm_db_get_point (ia_vertexids(1), xyz1, status )
+ sgm_db_get_point (ia_vertexids(2), xyz2, status )
+ IF (xyz1(1)>xyz2(1)) THEN
+ k=0
+ ELSE
+ k=1
+ END IF
+ 
+ FOR (j= 1 to n_str)
+ asm_const_grid_extract_v1( "`num_pnt+1`", "Surface `(s+2)*R+x`.`y`", (17*k+(1-2*k)*j)/(n_str+1),@
+ 1, asm_grid_extract_cu_created_ids )
+ num_pnt=num_pnt+1
+ 
+ END FOR
+ END FOR
+ 
+ FOR (i= 1 to R)
+ FOR (j= 1 to n_str)
+ asm_const_line_2point( "`num_crv+1`", "point `num_pnt-n_str*(R+1)+n_str*(i-1)+j`", "point `num_pnt-n_str*(R+1)+n_str*i+j`", 0, "", 50., 1, @
+ asm_line_2point_created_ids )
+ num_crv=num_crv+1
+ END FOR
+ END FOR
+END FOR
+$#-----------------------------------------------------------------------------------------------------------
+$#---------------------------------------------- stringer properties ------------------------------------
+beam_section_create( "N_section", "HAT", ["`HH`", "`tt`", "`WW`", "`W1`"] )
+REAL ord
+ord = W1*tt*tt+tt*HH*HH+tt*(WW-2*tt)*(HH-tt/2)
+ord =ord /(2*W1*tt+2*tt*HH+(WW-2*tt)*tt)
+ord= Ord+WB_skinthick/2
+
+REAL u
+STRING nm[1]
+u = 1;
+FOR (j= 0 to 1)
+ y=WB_face(j+1,1)
+ sgm_db_get_gen_face_edge_ids ( R*(j+2)+1, 1, 4, @
+ loop_ids, edge_ids, edge_orients )
+ sgm_get_curve_length (edge_ids(y), length)
+ IF ( u == 1 ) THEN
+ nm = "L"
+ ELSE
+ nm = "U"
+ END IF
+ FOR (i= 1 to n_str)
+ asm_const_grid_extract_v1( "`num_pnt+1`", "Surface `R*(j+2)+1`.`y`", i*1.0/(n_str+1)+(WW/2+W1)/length,@
+ 1, asm_grid_extract_cu_created_ids )
+ num_pnt=num_pnt+1
+ db_get_point_id ( num_pnt, pointid)
+ sgm_db_get_point ( pointid, xyz1, status )
+ asm_const_grid_extract_v1( "`num_pnt+1`", "Surface `R*(j+2)+1`.`y`", i*1.0/(n_str+1)-(WW/2+W1)/length,@
+ 1, asm_grid_extract_cu_created_ids )
+ num_pnt=num_pnt+1
+ db_get_point_id ( num_pnt, pointid)
+ sgm_db_get_point ( pointid, xyz2, status )
+ 
+ dist =mth_sqrt((xyz1(1)-xyz2(1))**2+(xyz1(2)-xyz2(2))**2+(xyz1(3)-xyz2(3))**2)
+ xyz3(1)=(xyz1(1)-xyz2(1))/dist
+ xyz3(3)=(xyz1(3)-xyz2(3))/dist
+ 
+ data(1)="N_section"
+ data(2)="m:Aluminium"
+ data(3)="<`u*xyz3(3)`,0,`-1*u*xyz3(1)`>"
+ data(4)="<`ord*(u*xyz3(3))`,0,`ord*(-1*u*xyz3(1))`>"
+ data(5)="<`ord*(u*xyz3(3))`,0,`ord*(-1*u*xyz3(1))`>"
+ data(6)="1"
+ data(7)="1"
+ 
+ elementprops_create( nm//"Stringer"//str_from_integer(i), 11, 2, 42, 1, 1, 20, [39, 13, 6, 4042, 4043, @ 
+ 2047, 2048, 1, 10, 11, 4026, 1026, 4044, 4045, 4037, 4047, 4048, 4050, 4051, @ 
+ 4053, 4054, 4056, 4057, 4061, 8200, 8201, 8202], [11, 5, 2, 2, 2, 4, 4, 1, 1,@ 
+ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6, 4, 4, 4], data, "" ) 
+ END FOR
+ u=u*-1
+END FOR
+$#-----------------------------------------------------------------------------------------------------------
+$#---------------------------------------------- striger mesh ------------------------------------
+ga_group_create( "MStringers" ) 
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MSeed"] ) 
+mesh_seed_create( "Curve 5:`4+(n_str)*2*R`", 1, `ns`, 0., 0., 0. )
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MStringers"] ) 
+
+FOR (j= 0 to 1)
+ IF ( j == 0 ) THEN
+ nm = "L"
+ ELSE
+ nm = "U"
+ END IF
+ FOR (i= 1 to n_str)
+ fem_create_mesh_curv_1( "Curve `4+i+R*n_str*j`:`4+i+(R-1)*n_str+R*n_str*j`:`n_str`", 16384, 1., "Bar2", "#", "#", @
+ "Coord 0", "Coord 0", fem_create_mesh_curve_num_nodes, @ 
+ fem_create_mesh_curve_num_elems, fem_create_mesh_c_nodes_created, @ 
+ fem_create_mesh_c_elems_created )
+ fem_associate_elems_to_ep( nm//"Stringer"//str_from_integer(i), fem_create_mesh_c_elems_created, fem_create_mesh_curve_num_elems)
+ num_elem=num_elem+fem_create_mesh_curve_num_elems
+ END FOR
+END FOR
+$# ---------------------------------------Verify equivalence---------------------------------------------
+mesh_seed_display_mgr.erase( )
+ga_view_zoom_set( 48.765762 )
+REAL fem_equiv_all_x_equivtol_ab
+INTEGER fem_equiv_all_x_segment
+fem_equiv_all_group4( [" "], 0, "", 1, 1, 1.0, FALSE, @
+fem_equiv_all_x_equivtol_ab, fem_equiv_all_x_segment )
+gu_fit_view( )
+$# ----------------------------------------------------Fix------------------------------------------------------ 
+loadsbcs_create2( "fix", "Displacement", "Nodal", "", "Static", [ @
+"Surface `8*R+1`:`8*R+3`"], @
+ "Geometry", "Coord 0", "1.", ["<0,0,0>", "<0,0,0>", @
+"< >", "< >"], ["", "", "", ""] )
+$# --------------------------------------- export mesh ---------------------------------------------
+INTEGER MLE_id
+INTEGER MWB_id
+INTEGER MTR_id
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MLE"] )
+db_get_current_group_id(MLE_id)
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MWB"] )
+db_get_current_group_id(MWB_id)
+uil_viewport_post_groups.posted_groups( "default_viewport", 1, ["MTR"] )
+db_get_current_group_id(MTR_id)
+neutral_export2( root_path//"\fem.out", @
+"P3/PATRAN Neutral File from: D:\KADER\Structural\1.db", [TRUE, TRUE, FALSE, @
+FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @
+FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @
+FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE], FALSE, @
+3, [`MLE_id`,`MWB_id`,`MTR_id`] )
+uil_viewport_post_groups.posted_groups( "default_viewport", 7, ["MLE", "MRibs", "MSpars", "MStringers", "MStrips", "MTR", "MWB"] )
+
+$# --------------------------------------- Mass properties ---------------------------------------------
+uil_file_report.open_file( "mass.rpt", 80 )
+REAL mass_prop_mass_props_array(VIRTUAL)
+STRING mass_prop_entity_list[VIRTUAL]
+STRING mass_prop_reject_list[VIRTUAL]
+mass_prop.cleanup_detailed( mass_prop_mass_props_array, mass_prop_entity_list, @
+ mass_prop_reject_list )
+INTEGER mass_prop_noutputs
+STRING mass_prop_gnames_out[32](VIRTUAL)
+INTEGER mass_prop_entities(VIRTUAL)
+INTEGER mass_prop_entity_types(VIRTUAL)
+INTEGER mass_prop_len_elist
+INTEGER mass_prop_num_ents
+INTEGER mass_prop_len_rlist
+INTEGER mass_prop_num_rejects
+INTEGER mass_prop_segment_id
+INTEGER mass_prop_cord_label
+INTEGER mass_prop_user_cord_label
+mass_prop_create_detailed( "3D", "All", "FEM", "Summary", 0, [""], "", @
+ "Coord 0", "Use Element Properties", "Use Element Properties", "Coord 0", 3, @
+1, FALSE, FALSE, mass_prop_noutputs, mass_prop_gnames_out, mass_prop_entities, @
+mass_prop_entity_types, mass_prop_mass_props_array, mass_prop_entity_list, @
+mass_prop_len_elist, mass_prop_num_ents, mass_prop_reject_list, @
+mass_prop_len_rlist, mass_prop_num_rejects, mass_prop_segment_id, @
+mass_prop_cord_label, mass_prop_user_cord_label )
+mass_prop.gen_report_detailed( 80, mass_prop_noutputs, "Summary", "FEM", @
+mass_prop_gnames_out, mass_prop_entities, mass_prop_entity_types, @
+mass_prop_mass_props_array, "Use Element Properties", @
+mass_prop_user_cord_label, mass_prop_entity_list, mass_prop_num_ents, @
+mass_prop_len_elist, mass_prop_reject_list, mass_prop_num_rejects, @
+mass_prop_len_rlist )
+
+uil_file_close.go( )

@@ -1,0 +1,708 @@
+# ========== Variable declaration ====================
+# ======= geometry parameters ========
+set path "D:/KADER/MDO/2.cst"
+set fp [open "${path}/ICEM_input.txt" r]
+set file_data [read $fp]
+close $fp
+set data [split $file_data "\n"]
+set cr [lindex $data 0]
+set l [lindex $data 1]
+set ck [lindex $data 2]
+set xk [lindex $data 3]
+set sp [lindex $data 4]
+set ct [lindex $data 5]
+set xt [lindex $data 6]
+set s1 [lindex $data 7]
+# ======= domain  parameters ========
+set ratio 1
+set lengths [list [expr $cr/$ratio] [expr $cr/$ratio] [expr $ck/$ratio] [expr $ck/$ratio] [expr $ct/$ratio] [expr $ct/$ratio]]
+set far [expr ($sp * 15)]
+set tip_dis [expr ($sp +$cr * 5)]
+set alpha 45
+set beta 45
+# ======= mesh parameters ========
+set normal_dis 1e-004
+set TE_dis 0.001
+set bnd_lyr $TE_dis
+#
+set normal_nodes 60
+set chord_nodes 60
+set TE_nodes 40
+set TE_limit 4
+set bnd_nodes 10
+set tip_nodes 15
+set n1 30
+set n2 [expr round($n1 * (1-$s1)/$s1)]
+set n3 80
+# ======= other ========
+set pi 3.1415926536
+set cos_alpha [expr cos($alpha*$pi/180)]
+set sin_alpha [expr sin($alpha*$pi/180)]
+set cos_beta [expr cos($beta*$pi/180)]
+set sin_beta [expr sin($beta*$pi/180)]
+set edges1 [list 22 21 73 69 89 85 26 25]
+set edges2 [list 99 98 101 100 103 102 105 104]
+set edges3 [list 38 37 74 70 90 86 42 41]
+set edges4 [list 111 110 113 112 115 114 117 116]
+set prm_splt1 0.8
+set prm_splt2 0.5
+set prm_LE 0.05
+set prm_TE 0.98
+set curves [list E_93 E_87 E_78 E_64 E_47 E_94 crv.00 crv.01]
+# 
+# ========== Import geometry ====================
+# 
+ic_set_global geo_cad 1e-009 toler
+ic_chdir $path
+ic_trans_ps_tetin "${path}/wing_icem.x_t" ./wingicem.tin meter
+ic_load_tetin ./wingicem.tin 1e-07
+ic_geo_set_modified 0
+ic_csystem_display all 0
+ic_csystem_set_current global
+ic_boco_nastran_csystem reset
+ic_boco_solver 
+ic_boco_clear_icons 
+ic_csystem_display all 0
+ic_csystem_set_current global
+ic_boco_nastran_csystem reset
+ic_boco_solver 
+ic_boco_clear_icons 
+ic_csystem_display all 0
+ic_csystem_set_current global
+ic_boco_nastran_csystem reset
+ic_undo_group_end 
+# 
+# ========== Reverse curve direction ====================
+# 
+for {set i 0} {$i < 6} {incr i} { 
+set loc1 [lindex [ic_geo_get_crv_data_at_par 0 [lindex $curves $i]] 0];
+set loc2 [lindex [ic_geo_get_crv_data_at_par 1 [lindex $curves $i]] 0];
+if { [lindex $loc1 0] > [lindex $loc2 0] } {ic_geo_reverse_crv [lindex $curves $i] ; }
+} ;
+# 
+# ========== Create box points ====================
+# 
+ic_undo_group_begin 
+ic_geo_new_family GEOM
+ic_boco_set_part_color GEOM
+ic_point {} GEOM pnt.00 0,0,$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.01 0,0,-$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.02 0,$tip_dis,$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.03 0,$tip_dis,-$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.04 [expr ($xt + $ct)],0,$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.05 [expr ($xt + $ct)],0,-$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.06 [expr ($xt + $ct)],$tip_dis,$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.07 [expr ($xt + $ct)],$tip_dis,-$far
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.08 -$far,0,0
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.09 -$far,$tip_dis,0
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.10 [expr ($xt + $ct + $far)],0,0
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_point {} GEOM pnt.11 [expr ($xt + $ct + $far)],$tip_dis,0
+ic_undo_group_end
+# 
+# ========== Create box curves ====================
+# 
+ic_undo_group_begin 
+ic_undo_group_end 
+ic_boco_clear_icons 
+ic_csystem_display all 0
+ic_csystem_set_current global
+ic_boco_nastran_csystem reset
+ic_curve arc GEOM crv.00 {pnt.01 pnt.08 pnt.00}
+ic_curve arc GEOM crv.01 {pnt.03 pnt.09 pnt.02}
+ic_curve arc GEOM crv.02 {pnt.05 pnt.10 pnt.04}
+ic_curve arc GEOM crv.03 {pnt.07 pnt.11 pnt.06}
+ic_delete_geometry curve names crv.04 0
+ic_curve point GEOM crv.04 {pnt.00 pnt.04}
+ic_delete_geometry curve names crv.05 0
+ic_curve point GEOM crv.05 {pnt.01 pnt.05}
+ic_delete_geometry curve names crv.06 0
+ic_curve point GEOM crv.06 {pnt.02 pnt.06}
+ic_delete_geometry curve names crv.07 0
+ic_curve point GEOM crv.07 {pnt.03 pnt.07}
+# 
+# ========== Create fluid volume ====================
+#
+ic_geo_new_family FLUID
+ic_boco_set_part_color FLUID
+ic_geo_create_volume {0 0 0} {} FLUID
+# 
+# ========== Create boundary surfaces =============
+#
+ic_set_global geo_cad 0 toptol_userset
+ic_curve concat GEOM crv.8 {crv.00 crv.04 crv.02 crv.05}
+ic_curve concat GEOM crv.9 {crv.01 crv.06 crv.03 crv.07}
+#
+ic_geo_new_family LATERAL
+ic_boco_set_part_color LATERAL
+ic_surface 2-4crvs LATERAL srf.00 {0.01 {crv.8 crv.9}}
+ic_set_dormant_pickable point 0 {}
+ic_set_dormant_pickable curve 0 {}
+# 
+ic_undo_group_begin 
+ic_geo_new_family FAR
+ic_boco_set_part_color FAR
+ic_surface 2-4crvs FAR srf.01 {0.01 {crv.9}}
+ic_set_dormant_pickable point 0 {}
+ic_set_dormant_pickable curve 0 {}
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_geo_new_family SYM
+ic_boco_set_part_color SYM
+ic_surface 2-4crvs SYM srf.01 {0.01 {crv.8}}
+ic_set_dormant_pickable point 0 {}
+ic_set_dormant_pickable curve 0 {}
+ic_undo_group_end 
+# 
+# ========== Create fluid block ====================
+#
+ic_undo_group_begin 
+ic_hex_initialize_blocking {} FLUID 0 101
+ic_hex_switch_blocking root
+ic_hex_unblank_blocks 
+ic_hex_multi_grid_level 0
+ic_hex_projection_limit 0
+ic_hex_default_bunching_law default 2.0
+ic_hex_floating_grid off
+ic_hex_transfinite_degree 1
+ic_hex_unstruct_face_type one_tri
+ic_hex_set_unstruct_face_method uniform_quad
+ic_hex_set_n_tetra_smoothing_steps 20
+ic_hex_set_mesh_params PART_1 GEOM FLUID LATERAL FAR SYM -version 110
+ic_hex_error_messages off_minor
+ic_hex_switch_blocking root
+ic_undo_group_end 
+# 
+# ========== Wing surfaces =============
+#
+ic_undo_group_begin 
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_geo_set_part surface {F_104 F_111 F_109 F_115} WING 0
+ic_geo_set_part curve {E_93 E_87 E_78 E_64 E_47 E_94 E_74 E_79  E_69 E_84} WING 0
+ic_geo_set_part point {V_121 V_54 V_58 V_56 V_50 V_48} WING 0
+ic_delete_empty_parts 
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_geo_set_part surface F_102 SIDE 0
+ic_geo_set_part curve {E_47 E_94} SIDE 0
+ic_geo_set_part point {V_50 V_48} SIDE 0
+ic_delete_empty_parts 
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_start_bigunsop 
+ic_delete_elements family PART_1 no_undo 1
+ic_delete_geometry all families PART_1 1 1
+ic_geo_delete_family PART_1
+ic_finish_bigunsop 
+ic_undo_group_end 
+# 
+# ========== Associate block edges to box curves =============
+#
+ic_undo_group_begin 
+ic_hex_set_edge_projection 22 38 0 1 crv.8
+ic_hex_set_edge_projection 21 22 0 1 crv.8
+ic_hex_set_edge_projection 21 37 0 1 crv.8
+ic_hex_set_edge_projection 37 38 0 1 crv.8
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_hex_set_edge_projection 26 42 0 1 crv.9
+ic_hex_set_edge_projection 25 26 0 1 crv.9
+ic_hex_set_edge_projection 25 41 0 1 crv.9
+ic_hex_set_edge_projection 41 42 0 1 crv.9
+ic_undo_group_end 
+# 
+# ========== split block =============
+#
+ic_boco_clear_icons 
+ic_hex_switch_blocking root
+ic_hex_unblank_blocks 
+ic_csystem_display all 0
+ic_csystem_set_current global
+ic_boco_nastran_csystem reset
+ic_undo_group_begin 
+ic_hex_split_grid 22 26 V_56 m WING SIDE GEOM FLUID LATERAL FAR SYM
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_hex_split_grid 73 26 V_48 m WING SIDE GEOM FLUID LATERAL FAR SYM
+ic_undo_group_end 
+ic_hex_mark_blocks unmark
+# 
+# ========== ogrid block =============
+#
+ic_hex_mark_blocks unmark
+ic_undo_group_begin 
+ic_hex_mark_blocks superblock 28
+ic_hex_mark_blocks superblock 27
+ic_hex_mark_blocks superblock 13
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_hex_mark_blocks face_neighbors corners { 21 22 37 38 }
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_hex_mark_blocks face_neighbors corners { 25 26 41 42 }
+ic_undo_group_end 
+ic_undo_group_begin 
+ic_hex_ogrid 1 m GEOM FLUID LATERAL FAR SYM WING SIDE -version 50
+ic_hex_mark_blocks unmark
+ic_undo_group_end 
+# 
+# ========== associate airfoil curves to edges=============
+#
+for {set i 0} {$i < 6} {incr i} { 
+ic_hex_set_edge_projection [lindex $edges2 $i] [lindex $edges4 $i] 0 1 [lindex $curves $i];
+ic_hex_project_to_surface [lindex $edges2 $i] [lindex $edges4 $i];
+} ;
+# 
+# ========== MOVE ARC VERTICES =============
+#
+ic_hex_place_node 22 [expr (-$far * $cos_alpha)] 0 [expr ($far * $sin_alpha)]
+ic_hex_place_node 21 [expr (-$far * $cos_alpha)] 0 [expr (-$far * $sin_alpha)]
+ic_hex_align_vertices 1 1 0 1 0 -csys global 0:0,1 1:1,5 2:0,2 3:0,0 GEOM FLUID LATERAL FAR SYM WING SIDE
+ic_hex_place_node 38 [expr $xt + $ct + $far * $cos_beta ] 0 [expr $far * $sin_beta ]
+ic_hex_place_node 37 [expr $xt + $ct + $far * $cos_beta ] 0 [expr -$far * $sin_beta ]
+ic_hex_align_vertices 1 1 0 1 0 -csys global 0:2,2 1:1,5 2:0,2 3:0,0 GEOM FLUID LATERAL FAR SYM WING SIDE
+# 
+# ========== ajust far box dimensions =============
+#
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_LE [lindex $curves 4]] 0];
+ic_hex_place_node 105 [lindex $loc 0] $tip_dis [lindex $loc 2]
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_LE [lindex $curves 5]] 0];
+ic_hex_place_node 104 [lindex $loc 0] $tip_dis [lindex $loc 2]
+ic_hex_place_node 117 [expr ($xt + $ct)] $tip_dis 0
+ic_hex_place_node 116 [expr ($xt + $ct)] $tip_dis 0
+#
+#==========  mesh parameters =============
+#
+ic_undo_group_begin 
+ic_geo_set_family_params FAR no_crv_inf prism 1 emax 3 ehgt 0.0 hrat 0 nlay 0 erat 0 ewid 0 emin 0.0 edev 0.0 split_wall 0 internal_wall 1
+ic_geo_set_family_params INLET no_crv_inf prism 0 emax 3 ehgt 0.0 hrat 0 nlay 0 erat 0 ewid 0 emin 0.0 edev 0.0 split_wall 0 internal_wall 0
+ic_geo_set_family_params OUTLET no_crv_inf prism 0 emax 3 ehgt 0.0 hrat 0 nlay 0 erat 0 ewid 0 emin 0.0 edev 0.0 split_wall 0 internal_wall 0
+ic_geo_set_family_params SYM no_crv_inf prism 0 emax 3 ehgt 0.0 hrat 0 nlay 0 erat 0 ewid 0 emin 0.0 edev 0.0 split_wall 0 internal_wall 0
+ic_undo_group_end 
+ic_geo_params_blank_done part 1
+ic_undo_group_begin 
+ic_hex_set_mesh_params WING SIDE GEOM FLUID LATERAL FAR SYM -version 110
+ic_hex_compute_mesh_size WING SIDE GEOM FLUID LATERAL FAR SYM
+ic_undo_group_end 
+ic_hex_list_family_projection 
+ic_hex_create_mesh WING SIDE GEOM FLUID LATERAL FAR SYM proj 2 dim_to_mesh 3
+# 
+# ========== split edges linear =============
+#
+for {set i 0} {$i < 6} {incr i} { 
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_splt1 [lindex $curves $i]] 0];
+ic_hex_split_edge [lindex $edges2 $i] [lindex $edges4 $i] 0 [lindex $loc 0] [lindex $loc 1] [lindex $loc 2];
+if { $i == 4 || $i == 5 } {	ic_hex_split_edge [lindex $edges2 [expr $i+2]] [lindex $edges4 [expr $i+2]] 0 [lindex $loc 0]  $tip_dis  [lindex $loc 2]; }
+} ;
+#
+for {set i 0} {$i < 6} {incr i} { 
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_splt2 [lindex $curves $i]] 0];
+ic_hex_split_edge [lindex $edges2 $i] [lindex $edges4 $i] 0 [lindex $loc 0] [lindex $loc 1] [lindex $loc 2];
+if { $i == 4 || $i == 5 } {	ic_hex_split_edge [lindex $edges2 [expr $i+2]] [lindex $edges4 [expr $i+2]] 0 [lindex $loc 0]  $tip_dis  [lindex $loc 2]; }
+} ;
+#
+# ========== ajust root box dimensions=============
+#
+for {set i 0} {$i < 6} {incr i} { 
+ic_hex_place_node [lindex $edges2 $i] curve:[lindex $curves $i] $prm_LE;
+ic_hex_place_node [lindex $edges4 $i] curve:[lindex $curves $i] $prm_TE;
+} ;
+# 
+# ========== associate LE/TR edges to airfoil curves =============
+#
+for {set i 0} {$i < 3} {incr i} { 
+ic_hex_create_composite [list [lindex $curves [expr 2*$i]] [lindex $curves [expr 2*$i+1]]]
+ic_hex_set_edge_projection [lindex $edges4 [expr 2*$i]] [lindex $edges4 [expr 2*$i+1]] 0 1 [lindex $curves [expr 2*$i]];
+ic_hex_set_edge_projection [lindex $edges2 [expr 2*$i]] [lindex $edges2 [expr 2*$i+1]] 0 1 [lindex $curves [expr 2*$i]];
+} ;
+# 
+#==========  copy tip airfoil curves =============
+#
+ic_geo_project_curve_to_surface E_47 srf.01 crv.00 FAR 0 0
+ic_geo_project_curve_to_surface E_94 srf.01 crv.01 FAR 0 0
+
+for {set i 6} {$i < 8} {incr i} { 
+ic_hex_place_node [lindex $edges2 $i] [lindex [ic_hex_get_node_location [lindex $edges2 [expr $i-2]]] 0] $tip_dis [lindex [ic_hex_get_node_location [lindex $edges2 [expr $i-2]]] 2]
+ic_hex_place_node [lindex $edges4 $i] [lindex [ic_hex_get_node_location [lindex $edges4 [expr $i-2]]] 0] $tip_dis [lindex [ic_hex_get_node_location [lindex $edges4 [expr $i-2]]] 2]
+} ;
+
+#
+# ================== split TRE blocks =================
+#
+ic_hex_split_grid 38 37 V_48 0:2,3 m GEOM FLUID LATERAL FAR SYM WING SIDE
+ic_hex_move_node 130 V_54
+ic_hex_move_node 136 V_56
+ic_hex_move_node 142 V_48
+ic_hex_place_node 148 [expr $xt + $ct] $tip_dis 0
+# 
+# ========== RE - project curves =============
+#
+ic_hex_create_composite {crv.00 crv.01}
+for {set j 1} {$j < 4} {incr j} { 
+for {set i 0} {$i < 3} {incr i} { 
+ic_hex_set_edge_projection [lindex $edges2 [expr 2*$j]] [lindex $edges4 [expr 2*$j]] $i 1 [lindex $curves [expr 2*$j]]
+ic_hex_set_edge_projection [lindex $edges2 [expr 2*$j+1]] [lindex $edges4 [expr 2*$j+1]] $i 1 [lindex $curves [expr 2*$j]]
+} ;
+} ;
+ic_hex_set_edge_projection 104 146 0 1 crv.00 curve_intersection
+ic_hex_set_edge_projection 148 117 0 1 crv.00 curve_intersection
+ic_hex_set_edge_projection 148 116 0 1 crv.00 curve_intersection
+#
+#==========  Around Block =============
+#
+ic_hex_unstruct_face_type 
+ic_hex_set_unstruct_face_method 
+ic_hex_mark_blocks unmark
+ic_hex_mark_blocks superblock 13
+ic_hex_mark_blocks superblock 27
+ic_hex_mark_blocks superblock 28
+ic_hex_mark_blocks face_neighbors corners { 98 99 110 111 } { 104 105 116 117 }
+ic_hex_ogrid 1 not_marked m GEOM FLUID LATERAL FAR SYM WING SIDE -version 50
+ic_hex_mark_blocks unmark
+# 
+# ========== Ajust boundary layer =============
+#
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_TE [lindex $curves 0]] 0];
+set x1 [lindex $loc 0]; 
+set z1 [lindex $loc 2]; 
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_TE [lindex $curves 1]] 0];
+set x2 [lindex $loc 0]; 
+set z2 [lindex $loc 2]; 
+set delta [expr atan(abs($z2+$z1)/(2*($cr-($x2+$x1)/2)))]
+set cos_delta [expr cos($delta)]
+set sin_delta [expr sin($delta)]
+
+set smooth_dis [list [expr 0.2*$cr] [expr 0.2*$ck] [expr 0.2*$ct] [expr 0.2*$ct]]
+#
+set sign [list 1 -1]
+set bnd_edg1 [list 161 164 167 170 159 162 165 168]
+set bnd_edg2 [list 179 182 185 188 177 180 183 186]
+set bnd_edg3 [list 178 181 184 187]
+#
+for {set j 0} {$j < 3} {incr j} { 
+for {set i 0} {$i < 2} {incr i} { 
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_LE [lindex $curves [expr 2*$j+$i]]] 0];
+set loc1 [lindex [ic_geo_get_crv_data_at_par [expr $prm_LE-0.001] [lindex $curves [expr 2*$j+$i]]] 0];
+set loc2 [lindex [ic_geo_get_crv_data_at_par [expr $prm_LE+0.001] [lindex $curves [expr 2*$j+$i]]] 0];
+set angle [expr atan(([lindex $loc2 2]-[lindex $loc1 2])/([lindex $loc2 0]-[lindex $loc1 0]))]; 
+ic_hex_place_node [lindex $bnd_edg1 [expr $j+4*$i]] [expr [lindex $loc 0] - [lindex $sign $i] * $bnd_lyr*sin($angle)] [lindex $loc 1] [expr [lindex $loc 2] +[lindex $sign $i] *  $bnd_lyr*cos($angle)];
+set loc [lindex [ic_geo_get_crv_data_at_par $prm_TE [lindex $curves [expr 2*$j+$i]]] 0];
+set loc1 [lindex [ic_geo_get_crv_data_at_par [expr $prm_TE-0.001] [lindex $curves [expr 2*$j+$i]]] 0];
+set loc2 [lindex [ic_geo_get_crv_data_at_par [expr $prm_TE+0.001] [lindex $curves [expr 2*$j+$i]]] 0];
+set angle [expr atan(([lindex $loc2 2]-[lindex $loc1 2])/([lindex $loc2 0]-[lindex $loc1 0]))]; 
+ic_hex_place_node [lindex $bnd_edg2 [expr $j+4*$i]] [expr [lindex $loc 0] - [lindex $sign $i] * $bnd_lyr*sin($angle)] [lindex $loc 1] [expr [lindex $loc 2] +[lindex $sign $i]*  $bnd_lyr*cos($angle)]; 
+ic_hex_split_edge [lindex $edges3 [expr 2*$j+$i]] [lindex $bnd_edg2 [expr $j+4*$i]] 0 [expr [lindex $loc 0] - [lindex $sign $i] * [lindex $smooth_dis $j]*sin($angle)] [lindex $loc 1] [expr [lindex $loc 2] +[lindex $sign $i]* [lindex $smooth_dis $j]*cos($angle)]; 
+ic_hex_make_edge_curve_type [lindex $edges3 [expr 2*$j+$i]] [lindex $bnd_edg2 [expr $j+4*$i]] control_point; 
+if { $j==2 } {
+ic_hex_split_edge [lindex $edges3 [expr 2*$j+$i+2]] [lindex $bnd_edg2 [expr $j+4*$i+1]] 0 [expr [lindex $loc 0] - [lindex $sign $i] * [lindex $smooth_dis [expr $j+1]]*sin($angle)] $tip_dis [expr [lindex $loc 2] +[lindex $sign $i]* [lindex $smooth_dis [expr $j+1]]*cos($angle)]; 
+ic_hex_make_edge_curve_type [lindex $edges3 [expr 2*$j+$i+2]] [lindex $bnd_edg2 [expr $j+4*$i+1]] control_point; 
+} ;
+} ;
+set loc [lindex [ic_geo_get_crv_data_at_par 1 [lindex $curves [expr 2*$j]]] 0];
+ic_hex_place_node [lindex $bnd_edg3 $j] [expr [lindex $loc 0] + $bnd_lyr * $cos_delta] [lindex $loc 1] [expr - $bnd_lyr * $sin_delta];
+} ;
+#
+for {set i 0} {$i < 2} {incr i} { 
+set j [expr 3+$i*4]
+ic_hex_place_node [lindex $bnd_edg1 $j] [lindex [ic_hex_get_node_location [lindex $bnd_edg1 [expr $j-1]]] 0] $tip_dis [lindex [ic_hex_get_node_location [lindex $bnd_edg1 [expr $j-1]]] 2]
+ic_hex_place_node [lindex $bnd_edg2 $j] [lindex [ic_hex_get_node_location [lindex $bnd_edg2 [expr $j-1]]] 0] $tip_dis [lindex [ic_hex_get_node_location [lindex $bnd_edg2 [expr $j-1]]] 2]
+} ;
+#
+ic_hex_place_node [lindex $bnd_edg3 3] [expr [lindex $loc 0] + $bnd_lyr * $cos_delta] $tip_dis [expr - $bnd_lyr * $sin_delta];
+#
+ic_hex_place_node 129 [expr $xt + $ct + $far] 0 0
+ic_hex_place_node 135 [expr $xt + $ct + $far] $l 0
+ic_hex_place_node 141 [expr $xt + $ct + $far] $sp 0
+ic_hex_place_node 147 [expr $xt + $ct + $far] $tip_dis 0
+# 
+# ========== RE - project curves =============
+#
+ic_hex_create_composite {crv.00 crv.01}
+for {set j 1} {$j < 4} {incr j} { 
+for {set i 0} {$i < 3} {incr i} { 
+ic_hex_set_edge_projection [lindex $edges2 [expr 2*$j]] [lindex $edges4 [expr 2*$j]] $i 1 [lindex $curves [expr 2*$j]]
+ic_hex_set_edge_projection [lindex $edges2 [expr 2*$j+1]] [lindex $edges4 [expr 2*$j+1]] $i 1 [lindex $curves [expr 2*$j]]
+} ;
+} ;
+ic_hex_set_edge_projection 104 146 0 1 crv.00 curve_intersection
+ic_hex_set_edge_projection 148 117 0 1 crv.00 curve_intersection
+ic_hex_set_edge_projection 148 116 0 1 crv.00 curve_intersection
+#
+#==========  DELETE INSIDE BLOCKS =============
+#
+ic_hex_mark_blocks unmark
+ic_hex_mark_blocks superblock 13
+ic_hex_mark_blocks superblock 27
+ic_hex_change_element_id VORFN
+ic_delete_empty_parts 
+#
+#==========  TIP PERPENDICUALR =============
+#
+ic_geo_cre_pnt_on_crv_at_par GEOM pn1 [expr 1-$TE_dis/[ic_geo_crv_length [lindex $curves 0]]] [lindex $curves 0]; 
+ic_geo_cre_pnt_on_crv_at_par GEOM pn2 [expr 1-$TE_dis/[ic_geo_crv_length [lindex $curves 1]]] [lindex $curves 1]; 
+ic_hex_split_grid 130 111 pn1 0:2,3 m GEOM FLUID LATERAL FAR SYM WING SIDE
+ic_hex_split_grid 110 130 pn2 0:2,3 m GEOM FLUID LATERAL FAR SYM WING SIDE
+
+set limit_angle [expr $beta*$pi*($TE_limit-1)/(180*$TE_nodes+$TE_limit-2)]
+
+set TE_edg0 [list 204 212 220 228 252 260 268 276]
+
+set TE_edg1 [list 205 213 221 229 253 261 269 277]
+
+set TE_edg2 [list 206 214 222 230 254 262 270 278]
+
+for {set j 0} {$j < 4} {incr j} { 
+for {set i 0} {$i < 2} {incr i} {
+set loc [lindex [ic_geo_get_crv_data_at_par [expr 1-$TE_dis/[ic_geo_crv_length [lindex $curves [expr 2*$j+$i]]]] [lindex $curves [expr 2*$j+$i]]] 0];
+ic_hex_place_node [lindex $TE_edg1 [expr $j+4*$i]] [lindex $loc 0] [lindex $loc 1] [lindex $loc 2]; 
+set loc1 [lindex [ic_geo_get_crv_data_at_par [expr 1-$TE_dis/[ic_geo_crv_length [lindex $curves [expr 2*$j+$i]]]-0.001] [lindex $curves [expr 2*$j+$i]]] 0];
+set angle [expr atan(([lindex $loc 2]-[lindex $loc1 2])/([lindex $loc 0]-[lindex $loc1 0]))]; 
+set loc2 [list [expr [lindex $loc 0] - [lindex $sign $i] * $bnd_lyr*sin($angle)] [lindex $loc 1] [expr [lindex $loc 2] + [lindex $sign $i] * $bnd_lyr*cos($angle)]];
+ic_hex_place_node [lindex $TE_edg2 [expr $j+4*$i]] [lindex $loc2 0] [lindex $loc2 1] [lindex $loc2 2]; 
+set loc3 [list [expr [lindex $loc 0] - [lindex $sign $i] * [expr 100*$bnd_lyr] *sin($angle)] [lindex $loc 1] [expr [lindex $loc 2] + [lindex $sign $i] * [expr 100*$bnd_lyr] *cos($angle)]];
+ic_hex_split_edge [lindex $TE_edg0 [expr $j+4*$i]] [lindex $TE_edg2 [expr $j+4*$i]] 0 [lindex $loc3 0] [lindex $loc3 1] [lindex $loc3 2]; 
+ic_hex_make_edge_curve_type [lindex $TE_edg0 [expr $j+4*$i]] [lindex $TE_edg2 [expr $j+4*$i]] control_point; 
+ic_hex_place_node [lindex $TE_edg0 [expr $j+4*$i]] [expr $xt + $ct + $far*cos($limit_angle)] [lindex $loc 1] [expr [lindex $sign $i] * $far*sin($limit_angle)];
+} ;
+} ;
+#
+#==========  tip_far =============
+#
+ic_hex_mark_blocks unmark
+ic_hex_mark_blocks superblock 28
+ic_hex_mark_blocks face_neighbors corners { 104 105 116 117 } { 102 103 114 115 }
+ic_hex_ogrid 1 m GEOM FLUID LATERAL SYM WING SIDE -version 50
+ic_hex_mark_blocks unmark
+#
+set TE_edg3 [list 297 302 293 298 317 322 313 318 316 321 314 319]
+set pos [list $prm_LE $prm_TE [expr 1-$TE_dis/[ic_geo_crv_length [lindex $curves 4]]]]
+#
+for {set i 0} {$i < 2} {incr i} {
+set loc0 [lindex [ic_geo_get_crv_data_at_par [lindex $pos $i] [lindex $curves 4]] 0];
+set loc1 [lindex [ic_geo_get_crv_data_at_par [lindex $pos $i] [lindex $curves 5]] 0];
+set dis [expr abs([lindex $loc1 2]-[lindex $loc0 2])/10]
+set loc2 [lindex [ic_geo_get_crv_data_at_par [expr [lindex $pos $i]-0.001] [lindex $curves 4]] 0];
+set angle [expr atan(([lindex $loc0 2]-[lindex $loc2 2])/([lindex $loc0 0]-[lindex $loc2 0]))]; 
+set loc3 [list [expr [lindex $loc0 0] + $dis*sin($angle)] [lindex $loc0 1] [expr [lindex $loc0 2] - $dis*cos($angle)]];
+set loc4 [lindex [ic_geo_get_crv_data_at_par [expr [lindex $pos $i]-0.001] [lindex $curves 5]] 0];
+set angle [expr atan(([lindex $loc1 2]-[lindex $loc4 2])/([lindex $loc1 0]-[lindex $loc4 0]))]; 
+set loc5 [list [expr [lindex $loc1 0] - $dis*sin($angle)] [lindex $loc1 1] [expr [lindex $loc1 2] + $dis*cos($angle)]];
+ic_hex_place_node [lindex $TE_edg3 [expr 0+4*$i]] [lindex $loc3 0] $sp [lindex $loc3 2]; 
+ic_hex_place_node [lindex $TE_edg3 [expr 1+4*$i]] [lindex $loc3 0] $tip_dis [lindex $loc3 2]; 
+ic_hex_place_node [lindex $TE_edg3 [expr 2+4*$i]] [lindex $loc5 0] $sp [lindex $loc5 2]; 
+ic_hex_place_node [lindex $TE_edg3 [expr 3+4*$i]] [lindex $loc5 0] $tip_dis [lindex $loc5 2]; 
+} ;
+ic_hex_place_node 315 [expr ([lindex $loc3 0]+[lindex $loc5 0])/2] $sp [expr ([lindex $loc3 2]+[lindex $loc5 2])/2]
+ic_hex_place_node 320 [expr ([lindex $loc3 0]+[lindex $loc5 0])/2] $tip_dis [expr ([lindex $loc3 2]+[lindex $loc5 2])/2]
+set x221 [lindex [ic_hex_get_node_location 221] 0]
+set x269 [lindex [ic_hex_get_node_location 269] 0]
+set z221 [lindex [ic_hex_get_node_location 221] 2]
+set z269 [lindex [ic_hex_get_node_location 269] 2]
+set dis [expr sqrt(pow($x221-$x269,2)+pow($z221-$z269,2))]
+ic_hex_place_node 316 [expr ([lindex $loc3 0]+[lindex $loc5 0])/2] $sp [expr ([lindex $loc3 2]+[lindex $loc5 2])/2+$dis/2]
+ic_hex_place_node 314 [expr ([lindex $loc3 0]+[lindex $loc5 0])/2] $sp [expr ([lindex $loc3 2]+[lindex $loc5 2])/2-$dis/2]
+ic_hex_place_node 321 [expr ([lindex $loc3 0]+[lindex $loc5 0])/2] $tip_dis [expr ([lindex $loc3 2]+[lindex $loc5 2])/2+$dis/2]
+ic_hex_place_node 319 [expr ([lindex $loc3 0]+[lindex $loc5 0])/2] $tip_dis [expr ([lindex $loc3 2]+[lindex $loc5 2])/2-$dis/2]
+#
+ic_hex_link_shape 297 317 103 115 1.0
+ic_hex_link_shape 293 313 102 114 1.0
+ic_hex_link_shape 302 322 105 117 1.0
+ic_hex_link_shape 298 318 104 116 1.0
+# 
+# ========== Link boundary layer =============
+#
+ic_hex_link_shape 159 251 98 250 1.0
+ic_hex_link_shape 161 179 99 111 1.0
+ic_hex_link_shape 159 177 98 110 1.0
+ic_hex_link_shape 206 179 205 111 1.0
+ic_hex_link_shape 177 254 110 253 1.0
+#
+ic_hex_link_shape 162 259 100 258 1.0
+ic_hex_link_shape 164 182 101 113 1.0
+ic_hex_link_shape 162 180 100 112 1.0
+ic_hex_link_shape 214 182 213 113 1.0
+ic_hex_link_shape 180 262 112 261 1.0
+#
+ic_hex_link_shape 165 267 102 266 1.0
+ic_hex_link_shape 167 185 103 115 1.0
+ic_hex_link_shape 165 183 102 114 1.0
+ic_hex_link_shape 222 185 221 115 1.0
+ic_hex_link_shape 183 270 114 269 1.0
+#
+ic_hex_link_shape 168 275 104 274 1.0
+ic_hex_link_shape 170 188 105 117 1.0
+ic_hex_link_shape 168 186 104 116 1.0
+ic_hex_link_shape 230 188 229 117 1.0
+ic_hex_link_shape 186 278 116 277 1.0
+
+#
+#======================  mesh seed =============================
+#
+# ---- Trailing edge limit -----
+#
+ic_hex_set_mesh 253 130 n $TE_limit h1 3.0 h2 3.0 r1 2 r2 2 lmax 3 default unlocked
+ic_hex_set_mesh 130 205 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 178 206 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 254 178 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 261 136 n $TE_limit h1 3.0 h2 3.0 r1 2 r2 2 lmax 3 default unlocked
+ic_hex_set_mesh 136 213 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 181 214 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 262 181 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 269 142 n $TE_limit h1 3.0 h2 3.0 r1 2 r2 2 lmax 3 default unlocked
+ic_hex_set_mesh 142 221 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 184 222 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 270 184 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 277 148 n $TE_limit h1 3.0 h2 3.0 r1 2 r2 2 lmax 3 default unlocked
+ic_hex_set_mesh 148 229 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 187 230 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+ic_hex_set_mesh 278 187 n $TE_limit h1 0.0 h2 0.0 r1 2 r2 2 lmax 0 default unlocked
+#
+# ---- Trailing edge -----
+#
+ic_hex_set_mesh 205 111 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 206 179 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 110 253 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+ic_hex_set_mesh 177 254 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+ic_hex_set_mesh 213 113 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 214 182 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 112 261 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+ic_hex_set_mesh 180 262 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+ic_hex_set_mesh 221 115 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 222 185 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 114 269 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+ic_hex_set_mesh 183 270 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+ic_hex_set_mesh 229 117 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 230 188 n $TE_nodes h1 $TE_dis h2 3.0 r1 1.1 r2 2 lmax 3 geo1 unlocked
+ic_hex_set_mesh 116 277 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+ic_hex_set_mesh 186 278 n $TE_nodes h1 3.0 h2 $TE_dis r1 2 r2 1.1 lmax 3 geo2 unlocked
+#
+# ---- Chord NEAR -----
+#
+ic_hex_set_mesh 99 111 n $chord_nodes h1 linked 98 250 h2 linked 111 205 r1 1.1 r2 1.1 lmax 3 default unlocked
+ic_hex_set_mesh 161 179 n $chord_nodes h1 linked 98 250 h2 linked 111 205 r1 1.1 r2 1.1 lmax 3 default unlocked
+ic_hex_set_mesh 98 110 n $chord_nodes h1 linked 98 250 h2 linked 110 253 r1 1.1 r2 1.1 lmax 3 default unlocked
+ic_hex_set_mesh 159 177 n $chord_nodes h1 linked 98 250 h2 linked 110 253 r1 1.1 r2 1.1 lmax 3 default unlocked
+ic_hex_set_mesh 101 113 n $chord_nodes h1 linked 100 258 h2 linked 113 213 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 164 182 n $chord_nodes h1 linked 100 258 h2 linked 113 213 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 100 112 n $chord_nodes h1 linked 100 258 h2 linked 112 261 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 162 180 n $chord_nodes h1 linked 100 258 h2 linked 112 261 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 103 115 n $chord_nodes h1 linked 102 266 h2 linked 115 221 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 167 185 n $chord_nodes h1 linked 102 266 h2 linked 115 221 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 102 114 n $chord_nodes h1 linked 102 266 h2 linked 114 269 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 165 183 n $chord_nodes h1 linked 102 266 h2 linked 114 269 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 105 117 n $chord_nodes h1 linked 102 266 h2 linked 115 221 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 170 188 n $chord_nodes h1 linked 102 266 h2 linked 115 221 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 104 116 n $chord_nodes h1 linked 102 266 h2 linked 114 269 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 168 186 n $chord_nodes h1 linked 102 266 h2 linked 114 269 r1 1.1 r2 1.1 lmax 0 default unlocked
+#
+ic_hex_set_mesh 161 99 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 159 98 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 179 111 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 177 110 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 206 205 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 254 253 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 178 130 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 164 101 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 162 100 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 182 113 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 180 112 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 214 213 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 262 261 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 181 136 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 167 103 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 165 102 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 185 115 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 183 114 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 222 221 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 270 269 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 184 142 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 170 105 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 168 104 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 188 117 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 186 116 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 230 229 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 278 277 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 187 148 n $bnd_nodes h1 0.0 h2 $normal_dis r1 2 r2 1.1 lmax 0 geo2 unlocked
+#
+ic_hex_set_mesh 22 161 n $normal_nodes h1 0.0 h2 linked 161 99 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 21 159 n $normal_nodes h1 0.0 h2 linked 159 98 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 38 179 n $normal_nodes h1 0.0 h2 linked 179 111 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 37 177 n $normal_nodes h1 0.0 h2 linked 177 110 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 204 206 n $normal_nodes h1 0.0 h2 linked 206 205 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 252 254 n $normal_nodes h1 0.0 h2 linked 254 253 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 129 178 n $normal_nodes h1 0.0 h2 linked 178 130 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 73 164 n $normal_nodes h1 0.0 h2 linked 164 101 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 69 162 n $normal_nodes h1 0.0 h2 linked 162 100 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 74 182 n $normal_nodes h1 0.0 h2 linked 182 113 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 70 180 n $normal_nodes h1 0.0 h2 linked 180 112 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 212 214 n $normal_nodes h1 0.0 h2 linked 214 213 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 260 262 n $normal_nodes h1 0.0 h2 linked 262 261 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 135 181 n $normal_nodes h1 0.0 h2 linked 181 136 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 89 167 n $normal_nodes h1 0.0 h2 linked 167 103 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 85 165 n $normal_nodes h1 0.0 h2 linked 165 102 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 90 185 n $normal_nodes h1 0.0 h2 linked 185 115 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 86 183 n $normal_nodes h1 0.0 h2 linked 183 114 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 220 222 n $normal_nodes h1 0.0 h2 linked 222 221 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 268 270 n $normal_nodes h1 0.0 h2 linked 270 269 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 141 184 n $normal_nodes h1 0.0 h2 linked 184 142 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 26 170 n $normal_nodes h1 0.0 h2 linked 170 105 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 25 168 n $normal_nodes h1 0.0 h2 linked 168 104 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 42 188 n $normal_nodes h1 0.0 h2 linked 188 117 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 41 186 n $normal_nodes h1 0.0 h2 linked 186 116 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 228 230 n $normal_nodes h1 0.0 h2 linked 230 229 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 276 278 n $normal_nodes h1 0.0 h2 linked 278 277 r1 2 r2 1.1 lmax 0 geo2 unlocked
+ic_hex_set_mesh 147 187 n $normal_nodes h1 0.0 h2 linked 187 148 r1 2 r2 1.1 lmax 0 geo2 unlocked
+#
+# ---- Side -----
+#
+ic_hex_set_mesh 90 42 n $n3 h1rel [expr (1.0/($n3 *20))] h2 3 r1 1.1 r2 2 lmax 50 geo1 copy_to_parallel unlocked
+ic_hex_set_mesh 38 74 n $n1 h1rel [expr (1.0/($n1 *5))] h2 3 r1 1.1 r2 2 lmax 3 geo1 copy_to_parallel unlocked
+ic_hex_set_mesh 74 90 n $n2 h1 3 h2rel [expr (1.0/($n2 *5))] r1 2 r2 1.1 lmax 50 geo2 copy_to_parallel unlocked
+#
+# ---- Tip -----
+#
+ic_hex_set_mesh 297 317 n $chord_nodes h1 linked 102 266 h2 linked 115 221 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 293 313 n $chord_nodes h1 linked 102 266 h2 linked 114 269 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 302 322 n $chord_nodes h1 linked 102 266 h2 linked 115 221 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 298 318 n $chord_nodes h1 linked 102 266 h2 linked 114 269 r1 1.1 r2 1.1 lmax 0 default unlocked
+ic_hex_set_mesh 105 302 n $tip_nodes h1rel 0.0 h2rel 0.0 r1 2 r2 2 lmax 0 default copy_to_parallel unlocked
+# ========== CONVERT TO MESH  =============
+#
+ic_hex_list_family_projection
+ic_hex_create_mesh GEOM FLUID LATERAL FAR SYM WING SIDE proj 2 dim_to_mesh 3
+ic_hex_write_file ./mesh.uns GEOM FLUID LATERAL FAR SYM WING SIDE proj 2 dim_to_mesh 3 no_boco
+# 
+# ========== Export mesh=============
+#
+ic_boco_solver 
+ic_boco_solver {ANSYS Fluent}
+ic_solution_set_solver {ANSYS Fluent} 1
+ic_delete_empty_parts 
+ic_uns_check_duplicate_numbers 
+ic_uns_set_modified 1
+ic_boco_save project1.fbc
+ic_cart_is_loaded 
+ic_exec {D:/ANSYS Inc/v150/icemcfd/win64_amd/icemcfd/output-interfaces/fluent6} -dom {D:/KADER/MDO/2.cst/mesh.uns} -b project1.fbc -bin ./mesh
+
